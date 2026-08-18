@@ -4,7 +4,7 @@ import './index.css'
 
 const A4_W = 297
 const A4_H = 210
-const MARGIN = 10
+const DEFAULT_MARGIN = 10
 
 function PageImage({ src, className = '' }) {
   return <img src={src} alt="" className={`h-full w-full object-cover ${className}`} />
@@ -13,6 +13,8 @@ function PageImage({ src, className = '' }) {
 export default function App() {
   const [pages, setPages] = useState([])
   const [dragIndex, setDragIndex] = useState(null)
+  const [gap, setGap] = useState(0)
+  const [margin, setMargin] = useState(DEFAULT_MARGIN)
   const fileInputRef = useRef(null)
 
   const addFiles = useCallback((files) => {
@@ -21,8 +23,16 @@ export default function App() {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       name: file.name,
       url: URL.createObjectURL(file),
+      blank: false,
     }))
     setPages((prev) => [...prev, ...newPages])
+  }, [])
+
+  const addBlank = useCallback(() => {
+    setPages((prev) => [
+      ...prev,
+      { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, name: 'Blank page', url: null, blank: true },
+    ])
   }, [])
 
   const move = useCallback((index, dir) => {
@@ -66,7 +76,15 @@ export default function App() {
     if (Number.isInteger(from)) swap(from, index)
   }, [dragIndex, swap])
 
-  const createPdf = useCallback(() => {
+  const loadImage = (url) =>
+    new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = reject
+      img.src = url
+    })
+
+  const createPdf = useCallback(async () => {
     const doc = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
@@ -74,13 +92,11 @@ export default function App() {
       compress: true,
     })
 
-    const usableW = A4_W - MARGIN * 2
-    const usableH = A4_H - MARGIN * 2
-    const halfW = usableW / 2
+    const usableW = A4_W - margin * 2
+    const usableH = A4_H - margin * 2
+    const halfW = (usableW - gap) / 2
 
-    const placeImage = (url, x, y, w, h) => {
-      const img = new Image()
-      img.src = url
+    const placeImage = (img, x, y, w, h) => {
       const ratio = img.naturalWidth / img.naturalHeight
       let dw = w
       let dh = w / ratio
@@ -88,8 +104,17 @@ export default function App() {
         dh = h
         dw = h * ratio
       }
-      doc.addImage(url, 'JPEG', x + (w - dw) / 2, y + (h - dh) / 2, dw, dh, undefined, 'FAST')
+      doc.addImage(img, 'JPEG', x + (w - dw) / 2, y + (h - dh) / 2, dw, dh, undefined, 'FAST')
     }
+
+    const placePage = (page, x, y, w, h) => {
+      if (!page || page.blank) return
+      placeImage(imgMap.get(page.id), x, y, w, h)
+    }
+
+    const imagePages = pages.filter((p) => !p.blank)
+    const images = await Promise.all(imagePages.map((p) => loadImage(p.url)))
+    const imgMap = new Map(imagePages.map((p, i) => [p.id, images[i]]))
 
     let sheet = 0
     const sheetCount = Math.ceil(pages.length / 2)
@@ -97,13 +122,13 @@ export default function App() {
       if (sheet > 0) doc.addPage('a4', 'landscape')
       const left = pages[i * 2]
       const right = pages[i * 2 + 1]
-      if (left) placeImage(left.url, MARGIN, MARGIN, halfW, usableH)
-      if (right) placeImage(right.url, MARGIN + halfW, MARGIN, halfW, usableH)
+      placePage(left, margin, margin, halfW, usableH)
+      placePage(right, margin + halfW + gap, margin, halfW, usableH)
       sheet++
     }
 
     doc.save('book.pdf')
-  }, [pages])
+  }, [pages, gap, margin])
 
   const totalSheets = Math.ceil(pages.length / 2)
 
@@ -127,7 +152,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-6xl gap-6 px-6 py-6 lg:grid-cols-[1fr_320px]">
+      <main className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[1fr_420px]">
         <section className="space-y-6">
           <div className="rounded-xl border-2 border-dashed border-slate-300 bg-white p-8 text-center">
             <input
@@ -141,12 +166,20 @@ export default function App() {
                 e.target.value = ''
               }}
             />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
-            >
-              Upload pages
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+              >
+                Upload pages
+              </button>
+              <button
+                onClick={addBlank}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                + Blank page
+              </button>
+            </div>
             <p className="mt-2 text-sm text-slate-500">
               Each image becomes an A5 page. Drag to reorder.
             </p>
@@ -166,7 +199,11 @@ export default function App() {
                 }`}
               >
                 <div className="relative aspect-[148/210]">
-                  <PageImage src={page.url} />
+                  {page.blank ? (
+                    <div className="h-full w-full bg-white" />
+                  ) : (
+                    <PageImage src={page.url} />
+                  )}
                   <span className="absolute left-1 top-1 rounded bg-slate-900/70 px-1.5 py-0.5 text-xs font-medium text-white">
                     {i + 1}
                   </span>
@@ -203,22 +240,68 @@ export default function App() {
 
         <aside className="space-y-6">
           <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <h2 className="mb-3 text-sm font-semibold text-slate-700">A4 margins</h2>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min="0"
+                max="40"
+                step="1"
+                value={margin}
+                onChange={(e) => setMargin(Number(e.target.value))}
+                className="flex-1"
+              />
+              <span className="w-12 text-right text-sm tabular-nums text-slate-600">{margin} mm</span>
+            </div>
+            <p className="mt-2 text-xs text-slate-400">
+              Margin around the two A5 pages on each A4 sheet.
+            </p>
+          </section>
+
+          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <h2 className="mb-3 text-sm font-semibold text-slate-700">Page gap</h2>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min="0"
+                max="20"
+                step="1"
+                value={gap}
+                onChange={(e) => setGap(Number(e.target.value))}
+                className="flex-1"
+              />
+              <span className="w-12 text-right text-sm tabular-nums text-slate-600">{gap} mm</span>
+            </div>
+            <p className="mt-2 text-xs text-slate-400">
+              Gap between the two A5 pages on each A4 sheet.
+            </p>
+          </section>
+
+          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <h2 className="mb-3 text-sm font-semibold text-slate-700">Preview</h2>
             <div className="space-y-3">
               {Array.from({ length: totalSheets }, (_, i) => {
                 const left = pages[i * 2]
                 const right = pages[i * 2 + 1]
+                const usableW = A4_W - margin * 2
+                const gapPx = Math.round((gap / usableW) * 100)
+                const marginPx = Math.round((margin / A4_W) * 100)
                 return (
                   <div key={i} className="rounded-lg bg-slate-900 p-3">
                     <p className="mb-2 text-center text-xs text-slate-400">
                       Sheet {i + 1} of {totalSheets}
                     </p>
-                    <div className="mx-auto flex aspect-[297/210] w-full gap-1 overflow-hidden rounded bg-white p-1 shadow-lg">
-                      <div className="flex-1 overflow-hidden">
-                        {left ? <PageImage src={left.url} /> : <div className="h-full bg-slate-100" />}
-                      </div>
-                      <div className="flex-1 overflow-hidden">
-                        {right ? <PageImage src={right.url} /> : <div className="h-full bg-slate-100" />}
+                    <div
+                      className="mx-auto flex aspect-[297/210] w-full overflow-hidden rounded bg-slate-200 shadow-lg"
+                      style={{ padding: `${marginPx}px` }}
+                    >
+                      <div className="flex flex-1 gap-0" style={{ gap: `${gapPx}px` }}>
+                        <div className="flex-1 overflow-hidden">
+                          {left && !left.blank ? <PageImage src={left.url} /> : <div className="h-full bg-white" />}
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          {right && !right.blank ? <PageImage src={right.url} /> : <div className="h-full bg-white" />}
+                        </div>
                       </div>
                     </div>
                   </div>
