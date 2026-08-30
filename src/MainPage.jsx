@@ -13,8 +13,6 @@ export default function MainPage() {
     setGap,
     margin,
     setMargin,
-    cropMarks,
-    setCropMarks,
     whitenTolerance,
     setWhitenTolerance,
     whitenFeather,
@@ -97,14 +95,14 @@ export default function MainPage() {
             <button
               onClick={() => navigate('/edit')}
               disabled={pages.length === 0}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Edit
             </button>
             <button
               onClick={createPdf}
               disabled={pages.length === 0}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+              className="bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Create PDF
             </button>
@@ -114,7 +112,7 @@ export default function MainPage() {
 
       <main className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[1fr_470px]">
         <section className="space-y-6">
-          <div className="rounded-xl border-2 border-dashed border-slate-300 bg-white p-8 text-center">
+          <div className="border-2 border-dashed border-slate-300 bg-white p-8 text-center">
             <input
               ref={fileInputRef}
               type="file"
@@ -129,13 +127,13 @@ export default function MainPage() {
             <div className="flex items-center justify-center gap-3">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+                className="bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
               >
                 Upload pages
               </button>
               <button
                 onClick={addBlank}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                className="border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 + Blank page
               </button>
@@ -149,7 +147,7 @@ export default function MainPage() {
             {sides.map((side, si) => (
               <div
                 key={si}
-                className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200"
+                className="overflow-hidden bg-white shadow-sm ring-1 ring-slate-200"
               >
                 <div className="aspect-[297/216] w-full">
                   <SidePreview
@@ -170,7 +168,7 @@ export default function MainPage() {
                   <button
                     onClick={() => moveSide(si, -1)}
                     disabled={si === 0}
-                    className="rounded px-2 py-1 text-slate-600 hover:bg-slate-100 disabled:opacity-30"
+                    className="px-2 py-1 text-slate-600 hover:bg-slate-100 disabled:opacity-30"
                     title="Move left"
                   >
                     ←
@@ -181,7 +179,7 @@ export default function MainPage() {
                   <button
                     onClick={() => moveSide(si, 1)}
                     disabled={si === sides.length - 1}
-                    className="rounded px-2 py-1 text-slate-600 hover:bg-slate-100 disabled:opacity-30"
+                    className="px-2 py-1 text-slate-600 hover:bg-slate-100 disabled:opacity-30"
                     title="Move right"
                   >
                     →
@@ -193,12 +191,12 @@ export default function MainPage() {
         </section>
 
         <aside className="space-y-6">
-          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+          <section className="bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <h2 className="mb-3 text-sm font-semibold text-slate-700">Layout</h2>
             <select
               value={layoutId}
               onChange={(e) => setLayoutId(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+              className="w-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
             >
               {LAYOUTS.map((l) => (
                 <option key={l.id} value={l.id}>
@@ -209,7 +207,7 @@ export default function MainPage() {
             <p className="mt-2 text-xs text-slate-400">{layout.description}</p>
           </section>
 
-          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+          <section className="bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <h2 className="mb-3 text-sm font-semibold text-slate-700">Page numbers</h2>
             <label className="flex cursor-pointer items-center gap-3">
               <input
@@ -225,7 +223,7 @@ export default function MainPage() {
                 <select
                   value={numberStyle}
                   onChange={(e) => setNumberStyle(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+                  className="w-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
                 >
                   {NUMBER_STYLES.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -272,7 +270,7 @@ export default function MainPage() {
             )}
           </section>
 
-          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+          <section className="bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <h2 className="mb-3 text-sm font-semibold text-slate-700">US Letter margins</h2>
             <div className="flex items-center gap-3">
               <input
@@ -291,7 +289,7 @@ export default function MainPage() {
             </p>
           </section>
 
-          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+          <section className="bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <h2 className="mb-3 text-sm font-semibold text-slate-700">Page gap</h2>
             <div className="flex items-center gap-3">
               <input
@@ -310,7 +308,7 @@ export default function MainPage() {
             </p>
           </section>
 
-          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+          <section className="bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <h2 className="mb-3 text-sm font-semibold text-slate-700">Content shift</h2>
             <div className="flex items-center gap-3">
               <input
@@ -330,24 +328,7 @@ export default function MainPage() {
             </p>
           </section>
 
-          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-            <h2 className="mb-3 text-sm font-semibold text-slate-700">Crop marks</h2>
-            <label className="flex cursor-pointer items-center gap-3">
-              <input
-                type="checkbox"
-                checked={cropMarks}
-                onChange={(e) => setCropMarks(e.target.checked)}
-                className="h-4 w-4 accent-indigo-600"
-              />
-              <span className="text-sm text-slate-600">Show center crop marks</span>
-            </label>
-            <p className="mt-2 text-xs text-slate-400">
-              Draws a dashed line at the exact center of each sheet to help split it in half after
-              printing.
-            </p>
-          </section>
-
-          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+          <section className="bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <h2 className="mb-3 text-sm font-semibold text-slate-700">Whitening background</h2>
             <div className="space-y-3">
               <div>

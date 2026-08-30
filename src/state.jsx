@@ -32,7 +32,6 @@ export function BookProvider({ children }) {
   const [pages, setPages] = useState([])
   const [gap, setGap] = useState(6)
   const [margin, setMargin] = useState(DEFAULT_MARGIN)
-  const [cropMarks, setCropMarks] = useState(false)
   const [whitenTolerance, setWhitenTolerance] = useState(DEFAULT_TOLERANCE)
   const [whitenFeather, setWhitenFeather] = useState(DEFAULT_FEATHER)
   const [layoutId, setLayoutId] = useState('default')
@@ -208,18 +207,11 @@ export function BookProvider({ children }) {
         await placeNumber(leftSlot, margin, margin, halfW, usableH)
         await placeNumber(rightSlot, margin + halfW + gap, margin, halfW, usableH)
       }
-      if (cropMarks) {
-        doc.setDrawColor(0)
-        doc.setLineWidth(0.2)
-        doc.setLineDashPattern([1.5, 1.5], 0)
-        doc.line(LETTER_W / 2, margin, LETTER_W / 2, LETTER_H - margin)
-        doc.setLineDashPattern([], 0)
-      }
       pageIndex++
     }
 
     doc.save('book.pdf')
-  }, [pages, gap, margin, cropMarks, showNumbers, numberStyle, layoutId, numberSize, numberOffset, contentShift])
+  }, [pages, gap, margin, showNumbers, numberStyle, layoutId, numberSize, numberOffset, contentShift])
 
   const value = useMemo(
     () => ({
@@ -228,8 +220,6 @@ export function BookProvider({ children }) {
       setGap,
       margin,
       setMargin,
-      cropMarks,
-      setCropMarks,
       whitenTolerance,
       setWhitenTolerance,
       whitenFeather,
@@ -262,7 +252,6 @@ export function BookProvider({ children }) {
       pages,
       gap,
       margin,
-      cropMarks,
       whitenTolerance,
       whitenFeather,
       layoutId,

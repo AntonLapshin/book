@@ -10,7 +10,6 @@ export default function EditPage() {
     pages,
     gap,
     margin,
-    cropMarks,
     showNumbers,
     numberStyle,
     numberSize,
@@ -23,6 +22,11 @@ export default function EditPage() {
   const [sheetIndex, setSheetIndex] = useState(0)
   const [selectedPageId, setSelectedPageId] = useState(null)
   const [drag, setDrag] = useState(null)
+  const [showHelperLines, setShowHelperLines] = useState(false)
+  const [helperTop, setHelperTop] = useState(6)
+  const [helperLeft, setHelperLeft] = useState(6)
+  const [helperBottom, setHelperBottom] = useState(6)
+  const [helperRight, setHelperRight] = useState(6)
 
   const layout = getLayout(layoutId)
   const sheets = buildSheets(pages, layout)
@@ -93,7 +97,7 @@ export default function EditPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/')}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              className="border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
             >
               ← Back
             </button>
@@ -103,7 +107,7 @@ export default function EditPage() {
           </div>
           <button
             onClick={() => navigate('/')}
-            className="rounded-lg px-3 py-1.5 text-slate-500 transition hover:bg-slate-100"
+            className="px-3 py-1.5 text-slate-500 transition hover:bg-slate-100"
             aria-label="Close"
           >
             ✕
@@ -119,17 +123,59 @@ export default function EditPage() {
                 Sheet {selectedSheet.sheetNumber} · Side {selectedSheet.side} · click a page to
                 select it
               </p>
-              <ScaleWrapper className="mx-auto h-[58vh] w-full">
+              <div className="mb-2 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={showHelperLines}
+                    onChange={(e) => setShowHelperLines(e.target.checked)}
+                    className="h-4 w-4 accent-indigo-600"
+                  />
+                  <span className="text-sm text-slate-600">Show helper lines</span>
+                </label>
+                {showHelperLines && (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
+                    {[
+                      ['Top', helperTop, setHelperTop],
+                      ['Left', helperLeft, setHelperLeft],
+                      ['Bottom', helperBottom, setHelperBottom],
+                      ['Right (center)', helperRight, setHelperRight],
+                    ].map(([label, value, setter]) => (
+                      <label key={label} className="flex items-center gap-1.5">
+                        <span className="text-xs text-slate-500">{label}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={value}
+                          onChange={(e) => setter(Number(e.target.value))}
+                          className="w-16 border border-slate-300 bg-white px-1.5 py-0.5 text-right text-sm tabular-nums text-slate-700"
+                        />
+                        <span className="text-xs text-slate-400">mm</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <ScaleWrapper
+                className="mx-auto h-[58vh] w-full"
+                onClick={() => setSelectedPageId(null)}
+              >
                 <SheetView
                   sheet={selectedSheet}
                   margin={margin}
                   gap={gap}
-                  cropMarks={cropMarks}
                   showNumbers={showNumbers}
                   numberStyle={numberStyle}
                   numberSize={numberSize}
                   numberOffset={numberOffset}
                   contentShift={contentShift}
+                  showHelperLines={showHelperLines}
+                  helperTop={helperTop}
+                  helperLeft={helperLeft}
+                  helperBottom={helperBottom}
+                  helperRight={helperRight}
                   selectedId={selectedPageId}
                   onSelectPage={setSelectedPageId}
                   onResizeStart={handleResizeStart}
@@ -139,7 +185,7 @@ export default function EditPage() {
               </ScaleWrapper>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 rounded-lg bg-white px-6 py-3 shadow-sm ring-1 ring-slate-200">
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 bg-white px-6 py-3 shadow-sm ring-1 ring-slate-200">
               {selectedPage ? (
                 <>
                   <span className="max-w-40 truncate text-sm font-medium text-slate-600">
@@ -149,7 +195,7 @@ export default function EditPage() {
                     <span />
                     <button
                       onClick={() => adjust(0, -1)}
-                      className="h-9 w-9 rounded-md bg-slate-100 text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
+                      className="h-9 w-9 bg-slate-100 text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
                       title="Move up"
                     >
                       ↑
@@ -157,7 +203,7 @@ export default function EditPage() {
                     <span />
                     <button
                       onClick={() => adjust(-1, 0)}
-                      className="h-9 w-9 rounded-md bg-slate-100 text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
+                      className="h-9 w-9 bg-slate-100 text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
                       title="Move left"
                     >
                       ←
@@ -167,7 +213,7 @@ export default function EditPage() {
                     </span>
                     <button
                       onClick={() => adjust(1, 0)}
-                      className="h-9 w-9 rounded-md bg-slate-100 text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
+                      className="h-9 w-9 bg-slate-100 text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
                       title="Move right"
                     >
                       →
@@ -175,7 +221,7 @@ export default function EditPage() {
                     <span />
                     <button
                       onClick={() => adjust(0, 1)}
-                      className="h-9 w-9 rounded-md bg-slate-100 text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
+                      className="h-9 w-9 bg-slate-100 text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
                       title="Move down"
                     >
                       ↓
@@ -210,7 +256,7 @@ export default function EditPage() {
                 <button
                   key={`${sheet.sheetNumber}-${sheet.side}`}
                   onClick={() => selectSheet(i)}
-                  className={`shrink-0 rounded-md p-1 ring-2 transition ${
+                  className={`shrink-0 p-1 ring-2 transition ${
                     i === sheetIndex
                       ? 'bg-indigo-50 ring-indigo-500'
                       : 'bg-white ring-slate-200 hover:ring-slate-300'
@@ -223,7 +269,7 @@ export default function EditPage() {
                     {[leftPage, rightPage].map((page, pi) => (
                       <div
                         key={pi}
-                        className={`relative h-24 w-[4.5rem] overflow-hidden rounded ${
+                        className={`relative h-24 w-[4.5rem] overflow-hidden ${
                           page ? '' : 'bg-slate-100'
                         }`}
                       >
@@ -237,7 +283,7 @@ export default function EditPage() {
                         ) : null}
                         {page && (
                           <span
-                            className={`absolute left-0.5 top-0.5 rounded px-0.5 text-[9px] text-white ${
+                            className={`absolute left-0.5 top-0.5 px-0.5 text-[9px] text-white ${
                               selectedPageId === page.id ? 'bg-indigo-600' : 'bg-slate-900/70'
                             }`}
                           >

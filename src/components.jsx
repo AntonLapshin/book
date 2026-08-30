@@ -7,7 +7,7 @@ export function PageImage({ src, className = '' }) {
   return <img src={src} alt="" className={`h-full w-full object-cover ${className}`} />
 }
 
-export function ScaleWrapper({ children, className = '' }) {
+export function ScaleWrapper({ children, className = '', onClick }) {
   const containerRef = useRef(null)
   const contentRef = useRef(null)
   const [scale, setScale] = useState(1)
@@ -32,7 +32,7 @@ export function ScaleWrapper({ children, className = '' }) {
   }, [children])
 
   return (
-    <div ref={containerRef} className={`relative overflow-hidden ${className}`}>
+    <div ref={containerRef} className={`relative ${className}`} onClick={onClick}>
       <div
         ref={contentRef}
         className="absolute left-0 top-0 origin-top-left"
@@ -71,12 +71,16 @@ export function SheetView({
   sheet,
   margin,
   gap,
-  cropMarks,
   showNumbers,
   numberStyle,
   numberSize,
   numberOffset,
   contentShift,
+  showHelperLines = false,
+  helperTop = 6,
+  helperLeft = 6,
+  helperBottom = 6,
+  helperRight = 6,
   selectedId,
   onSelectPage,
   onResizeStart,
@@ -130,9 +134,22 @@ export function SheetView({
         style={{ left: `${x}px`, top: `${marginPx}px`, width: `${halfW}px`, height: `${usableH}px` }}
       >
         <div
-          className={`absolute ${interactive ? 'cursor-pointer' : ''}`}
-          style={{ left: `${cx}px`, top: `${cy}px`, width: `${dw2}px`, height: `${dh2}px` }}
-          onClick={interactive ? () => onSelectPage(page.id) : undefined}
+          className={`absolute border border-dashed border-slate-400/70 ${interactive ? 'cursor-pointer' : ''}`}
+          style={{
+            left: `${cx}px`,
+            top: `${cy}px`,
+            width: `${dw2}px`,
+            height: `${dh2}px`,
+            zIndex: selected ? 10 : 1,
+          }}
+          onClick={
+            interactive
+              ? (e) => {
+                  e.stopPropagation()
+                  onSelectPage(page.id)
+                }
+              : undefined
+          }
         >
           <img src={page.url} alt="" className="h-full w-full select-none" draggable={false} />
           {selected && (
@@ -141,12 +158,12 @@ export function SheetView({
           {selected && onResizeStart && (
             <div
               onPointerDown={(e) => onResizeStart(e, page, e.currentTarget.parentElement)}
-              className="absolute -right-2 -top-2 h-5 w-5 cursor-nwse-resize rounded-full bg-indigo-600 ring-2 ring-white"
+              className="absolute -right-2 -top-2 h-5 w-5 cursor-nesw-resize bg-indigo-600 ring-2 ring-white"
               title="Drag to resize"
             />
           )}
         </div>
-        <span className="absolute bottom-0.5 left-0.5 rounded bg-slate-900/70 px-1 py-0.5 text-[10px] leading-none text-white">
+        <span className="absolute bottom-0.5 left-0.5 bg-slate-900/70 px-1 py-0.5 text-[10px] leading-none text-white">
           {Math.round((dw2 / pxPerMm) * 10) / 10} × {Math.round((dh2 / pxPerMm) * 10) / 10} mm
         </span>
         {showNumbers && (
@@ -165,18 +182,42 @@ export function SheetView({
     <div
       className="relative bg-white"
       style={{ width: `${sheetW}px`, height: `${sheetH}px` }}
+      onClick={interactive ? () => onSelectPage(null) : undefined}
     >
       {renderPage(leftSlot, leftSize, leftX)}
       {renderPage(rightSlot, rightSize, rightX)}
-      {cropMarks && (
-        <div
-          className="absolute border-l-2 border-dashed border-slate-500"
-          style={{
-            left: `${sheetW / 2}px`,
-            top: `${marginPx}px`,
-            height: `${usableH}px`,
-          }}
-        />
+      {showHelperLines && (
+        <div className="pointer-events-none absolute inset-0 z-10">
+          <div
+            className="absolute border-l-2 border-dashed border-red-500"
+            style={{
+              left: `${sheetW / 2}px`,
+              top: `${marginPx}px`,
+              height: `${usableH}px`,
+            }}
+          />
+          <div
+            className="absolute border-2 border-dashed border-red-500"
+            style={{
+              left: `${helperLeft * pxPerMm}px`,
+              top: `${helperTop * pxPerMm}px`,
+              width: `${(LETTER_W / 2 - helperRight - helperLeft) * pxPerMm}px`,
+              height: `${(LETTER_H - helperTop - helperBottom) * pxPerMm}px`,
+            }}
+          />
+          <div
+            className="absolute border-2 border-dashed border-red-500"
+            style={{
+              left: `${(LETTER_W / 2 + helperRight) * pxPerMm}px`,
+              top: `${helperTop * pxPerMm}px`,
+              width: `${(LETTER_W / 2 - helperRight - helperLeft) * pxPerMm}px`,
+              height: `${(LETTER_H - helperTop - helperBottom) * pxPerMm}px`,
+            }}
+          />
+        </div>
+      )}
+      {interactive && (
+        <div className="pointer-events-none absolute inset-0 z-20 border-2 border-slate-400" />
       )}
     </div>
   )
@@ -209,7 +250,7 @@ export function WhiteningDialog({ page, initialTolerance, initialFeather, onAppl
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-6" onClick={onClose}>
       <div
-        className="max-h-full w-full max-w-4xl overflow-auto rounded-xl bg-white p-6 shadow-2xl"
+        className="max-h-full w-full max-w-4xl overflow-auto bg-white p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -219,7 +260,7 @@ export function WhiteningDialog({ page, initialTolerance, initialFeather, onAppl
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg px-3 py-1.5 text-slate-500 transition hover:bg-slate-100"
+            className="px-3 py-1.5 text-slate-500 transition hover:bg-slate-100"
             aria-label="Close"
           >
             ✕
@@ -229,13 +270,13 @@ export function WhiteningDialog({ page, initialTolerance, initialFeather, onAppl
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <p className="mb-1 text-center text-xs font-medium text-slate-500">Before</p>
-            <div className="flex h-[36rem] items-center justify-center overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
+            <div className="flex h-[36rem] items-center justify-center overflow-hidden bg-slate-100 ring-1 ring-slate-200">
               <img src={page.originalUrl} alt="Before" className="max-h-full max-w-full object-contain" />
             </div>
           </div>
           <div>
             <p className="mb-1 text-center text-xs font-medium text-slate-500">After</p>
-            <div className="flex h-[36rem] items-center justify-center overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
+            <div className="flex h-[36rem] items-center justify-center overflow-hidden bg-slate-100 ring-1 ring-slate-200">
               {busy ? (
                 <span className="text-sm text-slate-400">Processing…</span>
               ) : (
@@ -277,21 +318,21 @@ export function WhiteningDialog({ page, initialTolerance, initialFeather, onAppl
         <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
           <button
             onClick={() => onKeepOriginal(page.id)}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            className="border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           >
             Keep original
           </button>
           <button
             onClick={rerun}
             disabled={busy}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+            className="border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
           >
             Re-run
           </button>
           <button
             onClick={() => onApply(page.id, afterUrl)}
             disabled={busy}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
+            className="bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
           >
             Confirm whitened
           </button>
@@ -332,11 +373,11 @@ export function SidePreview({
         ) : (
           <PageImage src={page.url} />
         )}
-        <span className="absolute left-1 top-1 rounded bg-slate-900/70 px-1.5 py-0.5 text-xs font-medium text-white">
+        <span className="absolute left-1 top-1 bg-slate-900/70 px-1.5 py-0.5 text-xs font-medium text-white">
           {label}
         </span>
         {!page.blank && page.whitened && (
-          <span className="absolute left-1 bottom-1 rounded bg-emerald-600/80 px-1.5 py-0.5 text-[10px] font-medium text-white">
+          <span className="absolute left-1 bottom-1 bg-emerald-600/80 px-1.5 py-0.5 text-[10px] font-medium text-white">
             Whitened
           </span>
         )}
@@ -345,7 +386,7 @@ export function SidePreview({
             e.stopPropagation()
             onRemove(page.id)
           }}
-          className="absolute right-1 top-1 rounded bg-red-600/80 px-1.5 py-0.5 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100"
+          className="absolute right-1 top-1 bg-red-600/80 px-1.5 py-0.5 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100"
         >
           ✕
         </button>
