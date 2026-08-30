@@ -1,6 +1,10 @@
 import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react'
 import { jsPDF } from 'jspdf'
 import { whitenBackground } from './whiten'
+import { LAYOUTS, getLayout, buildSheets } from './layout'
+import { NUMBER_STYLES } from './numbering'
+import PageNumber from './PageNumber'
+import { pageNumberToDataUrl } from './renderNumber'
 import './index.css'
 
 const LETTER_W = 279
@@ -84,9 +88,10 @@ function useImageSize(src) {
   return size
 }
 
-function SheetPreview({ left, right, margin, gap, cropMarks, sheetIndex, totalSheets }) {
-  const leftSize = useImageSize(left && !left.blank ? left.url : null)
-  const rightSize = useImageSize(right && !right.blank ? right.url : null)
+function SheetPreview({ sheetNumber, side, slots, margin, gap, cropMarks, numberStyle }) {
+  const [leftSlot, rightSlot] = slots
+  const leftSize = useImageSize(leftSlot.page && !leftSlot.page.blank ? leftSlot.page.url : null)
+  const rightSize = useImageSize(rightSlot.page && !rightSlot.page.blank ? rightSlot.page.url : null)
 
   const sheetW = 560
   const sheetH = (LETTER_H / LETTER_W) * sheetW
@@ -99,7 +104,8 @@ function SheetPreview({ left, right, margin, gap, cropMarks, sheetIndex, totalSh
   const leftX = marginPx
   const rightX = marginPx + halfW + gapPx
 
-  const renderPage = (page, size, x) => {
+  const renderPage = (slot, size, x) => {
+    const { page, number } = slot
     if (!page || page.blank) {
       return (
         <div
@@ -131,6 +137,9 @@ function SheetPreview({ left, right, margin, gap, cropMarks, sheetIndex, totalSh
         <span className="absolute bottom-0.5 left-0.5 rounded bg-slate-900/70 px-1 py-0.5 text-[10px] leading-none text-white">
           {Math.round((dw / pxPerMm) * 10) / 10} × {Math.round((dh / pxPerMm) * 10) / 10} mm
         </span>
+        <div className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2">
+          <PageNumber number={number} style={numberStyle} width={Math.round(halfW * 0.5)} />
+        </div>
       </div>
     )
   }
@@ -138,15 +147,15 @@ function SheetPreview({ left, right, margin, gap, cropMarks, sheetIndex, totalSh
   return (
     <div className="rounded-lg bg-slate-900 p-3">
       <p className="mb-2 text-center text-xs text-slate-400">
-        Sheet {sheetIndex + 1} of {totalSheets} · {LETTER_W} × {LETTER_H} mm
+        Sheet {sheetNumber} · Side {side} · {LETTER_W} × {LETTER_H} mm
       </p>
       <ScaleWrapper className="mx-auto h-48 w-full">
         <div
           className="relative overflow-hidden rounded bg-slate-200 shadow-lg"
           style={{ width: `${sheetW}px`, height: `${sheetH}px` }}
         >
-          {renderPage(left, leftSize, leftX)}
-          {renderPage(right, rightSize, rightX)}
+          {renderPage(leftSlot, leftSize, leftX)}
+          {renderPage(rightSlot, rightSize, rightX)}
           {cropMarks && (
             <div
               className="absolute border-l-2 border-dashed border-slate-500"
@@ -291,7 +300,13 @@ export default function App() {
   const [whitenTolerance, setWhitenTolerance] = useState(DEFAULT_TOLERANCE)
   const [whitenFeather, setWhitenFeather] = useState(DEFAULT_FEATHER)
   const [dialogPage, setDialogPage] = useState(null)
+  const [layoutId, setLayoutId] = useState('default')
+  const [numberStyle, setNumberStyle] = useState(() => getLayout('default').pageNumber.style)
   const fileInputRef = useRef(null)
+
+  const layout = getLayout(layoutId)
+  const sheets = buildSheets(pages, layout)
+  const visibleSheets = sheets.filter((s) => s.slots.some((slot) => slot.page && !slot.page.blank))
 
   const addFiles = useCallback(async (files) => {
     const list = Array.from(files)
@@ -400,7 +415,8 @@ export default function App() {
       doc.addImage(img, 'JPEG', x + ix, y + iy, dw, dh, undefined, 'FAST')
     }
 
-    const placePage = (page, x, y, w, h) => {
+    const placePage = (slot, x, y, w, h) => {
+      const { page } = slot
       if (!page || page.blank) return
       placeImage(imgMap.get(page.id), x, y, w, h)
     }
@@ -409,14 +425,40 @@ export default function App() {
     const images = await Promise.all(imagePages.map((p) => loadImage(p.url)))
     const imgMap = new Map(imagePages.map((p, i) => [p.id, images[i]]))
 
-    let sheet = 0
-    const sheetCount = Math.ceil(pages.length / 2)
-    for (let i = 0; i < sheetCount; i++) {
-      if (sheet > 0) doc.addPage('letter', 'landscape')
-      const left = pages[i * 2]
-      const right = pages[i * 2 + 1]
-      placePage(left, margin, margin, halfW, usableH)
-      placePage(right, margin + halfW + gap, margin, halfW, usableH)
+    const numberCache = new Map()
+    const getNumberImage = async (number) => {
+      if (number == null) return null
+      const key = `${numberStyle}:${number}`
+      if (!numberCache.has(key)) {
+        numberCache.set(key, await pageNumberToDataUrl({ number, style: numberStyle }))
+      }
+      return numberCache.get(key)
+    }
+
+    const placeNumber = async (slot, x, y, w, h) => {
+      const { number } = slot
+      if (number == null) return
+      const dataUrl = await getNumberImage(number)
+      if (!dataUrl) return
+      const numW = Math.min(w * 0.5, 60)
+      const numH = (numW * 56) / 240
+      const nx = x + (w - numW) / 2
+      const ny = y + h - numH - 2
+      doc.addImage(dataUrl, 'PNG', nx, ny, numW, numH, undefined, 'FAST')
+    }
+
+    const layout = getLayout(layoutId)
+    const sheets = buildSheets(pages, layout)
+    const visibleSheets = sheets.filter((s) => s.slots.some((slot) => slot.page && !slot.page.blank))
+
+    let pageIndex = 0
+    for (const sheet of visibleSheets) {
+      if (pageIndex > 0) doc.addPage('letter', 'landscape')
+      const [leftSlot, rightSlot] = sheet.slots
+      placePage(leftSlot, margin, margin, halfW, usableH)
+      placePage(rightSlot, margin + halfW + gap, margin, halfW, usableH)
+      await placeNumber(leftSlot, margin, margin, halfW, usableH)
+      await placeNumber(rightSlot, margin + halfW + gap, margin, halfW, usableH)
       if (cropMarks) {
         doc.setDrawColor(0)
         doc.setLineWidth(0.2)
@@ -424,13 +466,11 @@ export default function App() {
         doc.line(LETTER_W / 2, margin, LETTER_W / 2, LETTER_H - margin)
         doc.setLineDashPattern([], 0)
       }
-      sheet++
+      pageIndex++
     }
 
     doc.save('book.pdf')
-  }, [pages, gap, margin, cropMarks])
-
-  const totalSheets = Math.ceil(pages.length / 2)
+  }, [pages, gap, margin, cropMarks, numberStyle, layoutId])
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
@@ -439,7 +479,8 @@ export default function App() {
           <h1 className="text-xl font-semibold">Book Maker</h1>
           <div className="flex items-center gap-3">
             <span className="text-sm text-slate-500">
-              {pages.length} page{pages.length === 1 ? '' : 's'} · {totalSheets} US Letter sheet{totalSheets === 1 ? '' : 's'}
+              {pages.length} page{pages.length === 1 ? '' : 's'} · {visibleSheets.length} US Letter sheet
+              {visibleSheets.length === 1 ? '' : 's'}
             </span>
             <button
               onClick={createPdf}
@@ -481,7 +522,7 @@ export default function App() {
               </button>
             </div>
             <p className="mt-2 text-sm text-slate-500">
-              Each image becomes an A5 page. Drag to reorder.
+              Each image becomes one book page. Drag to reorder.
             </p>
           </div>
 
@@ -551,6 +592,40 @@ export default function App() {
 
         <aside className="space-y-6">
           <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <h2 className="mb-3 text-sm font-semibold text-slate-700">Layout</h2>
+            <select
+              value={layoutId}
+              onChange={(e) => setLayoutId(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+            >
+              {LAYOUTS.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-slate-400">{layout.description}</p>
+          </section>
+
+          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <h2 className="mb-3 text-sm font-semibold text-slate-700">Page numbers</h2>
+            <select
+              value={numberStyle}
+              onChange={(e) => setNumberStyle(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+            >
+              {NUMBER_STYLES.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-slate-400">
+              Rendered at the bottom center of every page.
+            </p>
+          </section>
+
+          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <h2 className="mb-3 text-sm font-semibold text-slate-700">US Letter margins</h2>
             <div className="flex items-center gap-3">
               <input
@@ -565,7 +640,7 @@ export default function App() {
               <span className="w-12 text-right text-sm tabular-nums text-slate-600">{margin} mm</span>
             </div>
             <p className="mt-2 text-xs text-slate-400">
-              Margin around the two A5 pages on each US Letter sheet.
+              Margin around the two book pages on each US Letter sheet.
             </p>
           </section>
 
@@ -584,7 +659,7 @@ export default function App() {
               <span className="w-12 text-right text-sm tabular-nums text-slate-600">{gap} mm</span>
             </div>
             <p className="mt-2 text-xs text-slate-400">
-              Gap between the two A5 pages on each US Letter sheet.
+              Gap between the two book pages on each US Letter sheet.
             </p>
           </section>
 
@@ -647,16 +722,16 @@ export default function App() {
           <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <h2 className="mb-3 text-sm font-semibold text-slate-700">Preview</h2>
             <div className="space-y-3">
-              {Array.from({ length: totalSheets }, (_, i) => (
+              {visibleSheets.map((sheet) => (
                 <SheetPreview
-                  key={i}
-                  sheetIndex={i}
-                  totalSheets={totalSheets}
-                  left={pages[i * 2]}
-                  right={pages[i * 2 + 1]}
+                  key={`${sheet.sheetNumber}-${sheet.side}`}
+                  sheetNumber={sheet.sheetNumber}
+                  side={sheet.side}
+                  slots={sheet.slots}
                   margin={margin}
                   gap={gap}
                   cropMarks={cropMarks}
+                  numberStyle={numberStyle}
                 />
               ))}
               {pages.length === 0 && (

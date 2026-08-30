@@ -1,0 +1,25 @@
+{
+  "default": {
+    "id": "default",
+    "name": "8.5×11 · Fold & cut",
+    "description": "Two pages per side on US Letter, folded and cut, then stacked and glued to the spine.",
+    "paper": {
+      "widthMm": 279,
+      "heightMm": 216,
+      "orientation": "landscape"
+    },
+    "pagesPerSide": 2,
+    "imposition": {
+      "type": "signature",
+      "signatureSize": 4,
+      "sides": [
+        { "side": 1, "slots": [3, 0] },
+        { "side": 2, "slots": [1, 2] }
+      ]
+    },
+    "pageNumber": {
+      "position": "bottom-center",
+      "style": "classic"
+    }
+  }
+}
