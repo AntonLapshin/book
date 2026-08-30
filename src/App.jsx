@@ -9,12 +9,14 @@ import './index.css'
 
 const LETTER_W = 279
 const LETTER_H = 216
-const DEFAULT_MARGIN = 10
+const DEFAULT_MARGIN = 0
 const DEFAULT_TOLERANCE = 4
 const DEFAULT_FEATHER = 1
 const DEFAULT_NUMBER_SIZE = 1
 const DEFAULT_NUMBER_OFFSET = 2
 const DEFAULT_CONTENT_SHIFT = 0
+
+const DEFAULT_EDIT = { x: 0, y: 0, scale: 1 }
 
 function containedSize(naturalW, naturalH, slotW, slotH) {
   const ratio = naturalW / naturalH
@@ -91,12 +93,26 @@ function useImageSize(src) {
   return size
 }
 
-function SheetPreview({ sheetNumber, side, slots, margin, gap, cropMarks, numberStyle, numberSize, numberOffset, contentShift }) {
-  const [leftSlot, rightSlot] = slots
+function SheetView({
+  sheet,
+  margin,
+  gap,
+  cropMarks,
+  showNumbers,
+  numberStyle,
+  numberSize,
+  numberOffset,
+  contentShift,
+  selectedId,
+  onSelectPage,
+  onResizeStart,
+  sheetW = 560,
+  interactive = false,
+}) {
+  const [leftSlot, rightSlot] = sheet.slots
   const leftSize = useImageSize(leftSlot.page && !leftSlot.page.blank ? leftSlot.page.url : null)
   const rightSize = useImageSize(rightSlot.page && !rightSlot.page.blank ? rightSlot.page.url : null)
 
-  const sheetW = 560
   const sheetH = (LETTER_H / LETTER_W) * sheetW
   const pxPerMm = sheetW / LETTER_W
   const marginPx = margin * pxPerMm
@@ -126,7 +142,13 @@ function SheetPreview({ sheetNumber, side, slots, margin, gap, cropMarks, number
         />
       )
     }
-    const { dw, dh, x: ix, y: iy } = containedSize(size.w, size.h, halfW, usableH)
+    const edit = { ...DEFAULT_EDIT, ...page.edit }
+    const { dw, dh } = containedSize(size.w, size.h, halfW, usableH)
+    const dw2 = dw * edit.scale
+    const dh2 = dh * edit.scale
+    const cx = (halfW - dw2) / 2 + edit.x * pxPerMm
+    const cy = (usableH - dh2) / 2 + edit.y * pxPerMm - shiftPx
+    const selected = interactive && selectedId === page.id
     const numW = Math.round(halfW * 0.5 * numberSize)
     return (
       <div
@@ -134,48 +156,290 @@ function SheetPreview({ sheetNumber, side, slots, margin, gap, cropMarks, number
         style={{ left: `${x}px`, top: `${marginPx}px`, width: `${halfW}px`, height: `${usableH}px` }}
       >
         <div
-          className="absolute"
-          style={{ left: `${ix}px`, top: `${iy - shiftPx}px`, width: `${dw}px`, height: `${dh}px` }}
+          className={`absolute ${interactive ? 'cursor-pointer' : ''}`}
+          style={{ left: `${cx}px`, top: `${cy}px`, width: `${dw2}px`, height: `${dh2}px` }}
+          onClick={interactive ? () => onSelectPage(page.id) : undefined}
         >
-          <img src={page.url} alt="" className="h-full w-full" draggable={false} />
+          <img src={page.url} alt="" className="h-full w-full select-none" draggable={false} />
+          {selected && (
+            <div className="pointer-events-none absolute inset-0 ring-4 ring-indigo-500" />
+          )}
+          {selected && onResizeStart && (
+            <div
+              onPointerDown={(e) => onResizeStart(e, page, e.currentTarget.parentElement)}
+              className="absolute -right-2 -top-2 h-5 w-5 cursor-nwse-resize rounded-full bg-indigo-600 ring-2 ring-white"
+              title="Drag to resize"
+            />
+          )}
         </div>
         <span className="absolute bottom-0.5 left-0.5 rounded bg-slate-900/70 px-1 py-0.5 text-[10px] leading-none text-white">
-          {Math.round((dw / pxPerMm) * 10) / 10} × {Math.round((dh / pxPerMm) * 10) / 10} mm
+          {Math.round((dw2 / pxPerMm) * 10) / 10} × {Math.round((dh2 / pxPerMm) * 10) / 10} mm
         </span>
-        <div
-          className="pointer-events-none absolute left-1/2 -translate-x-1/2"
-          style={{ bottom: `${numberOffset * pxPerMm}px` }}
-        >
-          <PageNumber number={number} style={numberStyle} width={numW} />
-        </div>
+        {showNumbers && (
+          <div
+            className="pointer-events-none absolute left-1/2 -translate-x-1/2"
+            style={{ bottom: `${numberOffset * pxPerMm}px` }}
+          >
+            <PageNumber number={number} style={numberStyle} width={numW} />
+          </div>
+        )}
       </div>
     )
   }
 
   return (
-    <div className="rounded-lg bg-slate-900 p-3">
-      <p className="mb-2 text-center text-xs text-slate-400">
-        Sheet {sheetNumber} · Side {side} · {LETTER_W} × {LETTER_H} mm
-      </p>
-      <ScaleWrapper className="mx-auto h-48 w-full">
+    <div
+      className="relative overflow-hidden rounded bg-slate-200 shadow-lg"
+      style={{ width: `${sheetW}px`, height: `${sheetH}px` }}
+    >
+      {renderPage(leftSlot, leftSize, leftX)}
+      {renderPage(rightSlot, rightSize, rightX)}
+      {cropMarks && (
         <div
-          className="relative overflow-hidden rounded bg-slate-200 shadow-lg"
-          style={{ width: `${sheetW}px`, height: `${sheetH}px` }}
-        >
-          {renderPage(leftSlot, leftSize, leftX)}
-          {renderPage(rightSlot, rightSize, rightX)}
-          {cropMarks && (
-            <div
-              className="absolute border-l-2 border-dashed border-slate-500"
-              style={{
-                left: `${sheetW / 2}px`,
-                top: `${marginPx}px`,
-                height: `${usableH}px`,
-              }}
-            />
+          className="absolute border-l-2 border-dashed border-slate-500"
+          style={{
+            left: `${sheetW / 2}px`,
+            top: `${marginPx}px`,
+            height: `${usableH}px`,
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function EditModal({
+  sheets,
+  pages,
+  sheetIndex,
+  selectedPageId,
+  onSelectSheet,
+  onSelectPage,
+  onEdit,
+  onClose,
+  margin,
+  gap,
+  cropMarks,
+  showNumbers,
+  numberStyle,
+  numberSize,
+  numberOffset,
+  contentShift,
+}) {
+  const [drag, setDrag] = useState(null)
+
+  const selectedSheet = sheets[sheetIndex] ?? null
+  const selectedPage = pages.find((p) => p.id === selectedPageId) ?? null
+
+  useEffect(() => {
+    if (!drag) return
+    const onMove = (e) => {
+      const nx = drag.handleX + (e.clientX - drag.startX)
+      const ny = drag.handleY + (e.clientY - drag.startY)
+      const dist = Math.hypot(nx - drag.centerX, ny - drag.centerY)
+      const scale = Math.max(0.2, (dist / drag.startDist) * drag.startScale)
+      onEdit(drag.id, { scale })
+    }
+    const onUp = () => setDrag(null)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+  }, [drag, onEdit])
+
+  const adjust = (dx, dy) => {
+    if (!selectedPage) return
+    const edit = { ...DEFAULT_EDIT, ...selectedPage.edit }
+    onEdit(selectedPage.id, { x: edit.x + dx, y: edit.y + dy })
+  }
+
+  const handleResizeStart = (e, page, el) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const r = el.getBoundingClientRect()
+    const centerX = r.left + r.width / 2
+    const centerY = r.top + r.height / 2
+    const handleX = r.right
+    const handleY = r.top
+    const startDist = Math.hypot(handleX - centerX, handleY - centerY)
+    setDrag({
+      id: page.id,
+      startScale: page.edit?.scale ?? 1,
+      centerX,
+      centerY,
+      handleX,
+      handleY,
+      startDist,
+      startX: e.clientX,
+      startY: e.clientY,
+    })
+  }
+
+  const edit = selectedPage ? { ...DEFAULT_EDIT, ...selectedPage.edit } : DEFAULT_EDIT
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-full w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+          <h2 className="text-lg font-semibold text-slate-800">
+            Edit layout · {pages.length} page{pages.length === 1 ? '' : 's'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="rounded-lg px-3 py-1.5 text-slate-500 transition hover:bg-slate-100"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="flex flex-1 flex-col items-center gap-4 overflow-y-auto p-6">
+          {selectedSheet ? (
+            <>
+              <div className="w-full">
+                <p className="mb-2 text-center text-xs text-slate-400">
+                  Sheet {selectedSheet.sheetNumber} · Side {selectedSheet.side} · click a page to
+                  select it
+                </p>
+                <ScaleWrapper className="mx-auto h-[58vh] w-full">
+                  <SheetView
+                    sheet={selectedSheet}
+                    margin={margin}
+                    gap={gap}
+                    cropMarks={cropMarks}
+                    showNumbers={showNumbers}
+                    numberStyle={numberStyle}
+                    numberSize={numberSize}
+                    numberOffset={numberOffset}
+                    contentShift={contentShift}
+                    selectedId={selectedPageId}
+                    onSelectPage={onSelectPage}
+                    onResizeStart={handleResizeStart}
+                    sheetW={1000}
+                    interactive
+                  />
+                </ScaleWrapper>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 rounded-lg bg-slate-100 px-6 py-3">
+                {selectedPage ? (
+                  <>
+                    <span className="max-w-40 truncate text-sm font-medium text-slate-600">
+                      {selectedPage.name}
+                    </span>
+                    <div className="grid grid-cols-3 gap-1">
+                      <span />
+                      <button
+                        onClick={() => adjust(0, -1)}
+                        className="h-9 w-9 rounded-md bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
+                        title="Move up"
+                      >
+                        ↑
+                      </button>
+                      <span />
+                      <button
+                        onClick={() => adjust(-1, 0)}
+                        className="h-9 w-9 rounded-md bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
+                        title="Move left"
+                      >
+                        ←
+                      </button>
+                      <span className="flex h-9 w-9 items-center justify-center text-xs tabular-nums text-slate-400">
+                        {Math.round(edit.scale * 100)}%
+                      </span>
+                      <button
+                        onClick={() => adjust(1, 0)}
+                        className="h-9 w-9 rounded-md bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
+                        title="Move right"
+                      >
+                        →
+                      </button>
+                      <span />
+                      <button
+                        onClick={() => adjust(0, 1)}
+                        className="h-9 w-9 rounded-md bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
+                        title="Move down"
+                      >
+                        ↓
+                      </button>
+                      <span />
+                    </div>
+                    <div className="text-xs tabular-nums text-slate-400">
+                      x {edit.x} mm · y {edit.y} mm
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-sm text-slate-400">
+                    Select a page to adjust its position and scale.
+                  </span>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="text-slate-400">No pages to edit.</p>
           )}
         </div>
-      </ScaleWrapper>
+
+        <div className="border-t border-slate-200 bg-slate-50 p-4">
+          <p className="mb-2 text-xs font-medium text-slate-500">Sides (each side = 2 pages)</p>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {sheets.map((sheet, i) => {
+              const [left, right] = sheet.slots
+              const leftPage = left.page && !left.page.blank ? left.page : null
+              const rightPage = right.page && !right.page.blank ? right.page : null
+              return (
+                <button
+                  key={`${sheet.sheetNumber}-${sheet.side}`}
+                  onClick={() => onSelectSheet(i)}
+                  className={`shrink-0 rounded-md p-1 ring-2 transition ${
+                    i === sheetIndex ? 'bg-indigo-50 ring-indigo-500' : 'bg-white ring-slate-200 hover:ring-slate-300'
+                  }`}
+                >
+                  <div className="mb-1 text-center text-[10px] font-medium text-slate-500">
+                    Sheet {sheet.sheetNumber} · Side {sheet.side}
+                  </div>
+                  <div className="flex gap-1">
+                    {[leftPage, rightPage].map((page, pi) => (
+                      <div
+                        key={pi}
+                        className={`relative h-24 w-[4.5rem] overflow-hidden rounded ${
+                          page ? '' : 'bg-slate-100'
+                        }`}
+                      >
+                        {page ? (
+                          <img
+                            src={page.url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            draggable={false}
+                          />
+                        ) : null}
+                        {page && (
+                          <span
+                            className={`absolute left-0.5 top-0.5 rounded px-0.5 text-[9px] text-white ${
+                              selectedPageId === page.id ? 'bg-indigo-600' : 'bg-slate-900/70'
+                            }`}
+                          >
+                            {pi === 0 ? 'L' : 'R'}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -302,17 +566,21 @@ function WhiteningDialog({ page, initialTolerance, initialFeather, onApply, onKe
 export default function App() {
   const [pages, setPages] = useState([])
   const [dragIndex, setDragIndex] = useState(null)
-  const [gap, setGap] = useState(0)
+  const [gap, setGap] = useState(6)
   const [margin, setMargin] = useState(DEFAULT_MARGIN)
   const [cropMarks, setCropMarks] = useState(false)
   const [whitenTolerance, setWhitenTolerance] = useState(DEFAULT_TOLERANCE)
   const [whitenFeather, setWhitenFeather] = useState(DEFAULT_FEATHER)
   const [dialogPage, setDialogPage] = useState(null)
   const [layoutId, setLayoutId] = useState('default')
+  const [showNumbers, setShowNumbers] = useState(true)
   const [numberStyle, setNumberStyle] = useState(() => getLayout('default').pageNumber.style)
   const [numberSize, setNumberSize] = useState(DEFAULT_NUMBER_SIZE)
   const [numberOffset, setNumberOffset] = useState(DEFAULT_NUMBER_OFFSET)
   const [contentShift, setContentShift] = useState(DEFAULT_CONTENT_SHIFT)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editSheetIndex, setEditSheetIndex] = useState(0)
+  const [editSelectedPageId, setEditSelectedPageId] = useState(null)
   const fileInputRef = useRef(null)
 
   const layout = getLayout(layoutId)
@@ -336,7 +604,7 @@ export default function App() {
       } catch {
         // fall back to original on failure
       }
-      newPages.push({ id, name: file.name, originalUrl, url, blank: false, whitened })
+      newPages.push({ id, name: file.name, originalUrl, url, blank: false, whitened, edit: { ...DEFAULT_EDIT } })
     }
     setPages((prev) => [...prev, ...newPages])
   }, [whitenTolerance, whitenFeather])
@@ -344,7 +612,13 @@ export default function App() {
   const addBlank = useCallback(() => {
     setPages((prev) => [
       ...prev,
-      { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, name: 'Blank page', url: null, blank: true },
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: 'Blank page',
+        url: null,
+        blank: true,
+        edit: { ...DEFAULT_EDIT },
+      },
     ])
   }, [])
 
@@ -372,6 +646,14 @@ export default function App() {
       prev.map((p) => (p.id === id ? { ...p, url: p.originalUrl, whitened: false } : p)),
     )
     setDialogPage(null)
+  }, [])
+
+  const editPage = useCallback((id, partial) => {
+    setPages((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, edit: { ...DEFAULT_EDIT, ...p.edit, ...partial } } : p,
+      ),
+    )
   }, [])
 
   const swap = useCallback((from, to) => {
@@ -421,15 +703,20 @@ export default function App() {
     const usableH = LETTER_H - margin * 2
     const halfW = (usableW - gap) / 2
 
-    const placeImage = (img, x, y, w, h) => {
-      const { dw, dh, x: ix, y: iy } = containedSize(img.naturalWidth, img.naturalHeight, w, h)
-      doc.addImage(img, 'JPEG', x + ix, y + iy - contentShift, dw, dh, undefined, 'FAST')
+    const placeImage = (img, x, y, w, h, edit) => {
+      const { dw, dh } = containedSize(img.naturalWidth, img.naturalHeight, w, h)
+      const edit2 = { ...DEFAULT_EDIT, ...edit }
+      const dw2 = dw * edit2.scale
+      const dh2 = dh * edit2.scale
+      const cx = x + (w - dw2) / 2 + edit2.x
+      const cy = y + (h - dh2) / 2 + edit2.y - contentShift
+      doc.addImage(img, 'JPEG', cx, cy, dw2, dh2, undefined, 'FAST')
     }
 
     const placePage = (slot, x, y, w, h) => {
       const { page } = slot
       if (!page || page.blank) return
-      placeImage(imgMap.get(page.id), x, y, w, h)
+      placeImage(imgMap.get(page.id), x, y, w, h, page.edit)
     }
 
     const imagePages = pages.filter((p) => !p.blank)
@@ -468,8 +755,10 @@ export default function App() {
       const [leftSlot, rightSlot] = sheet.slots
       placePage(leftSlot, margin, margin, halfW, usableH)
       placePage(rightSlot, margin + halfW + gap, margin, halfW, usableH)
-      await placeNumber(leftSlot, margin, margin, halfW, usableH)
-      await placeNumber(rightSlot, margin + halfW + gap, margin, halfW, usableH)
+      if (showNumbers) {
+        await placeNumber(leftSlot, margin, margin, halfW, usableH)
+        await placeNumber(rightSlot, margin + halfW + gap, margin, halfW, usableH)
+      }
       if (cropMarks) {
         doc.setDrawColor(0)
         doc.setLineWidth(0.2)
@@ -481,7 +770,7 @@ export default function App() {
     }
 
     doc.save('book.pdf')
-  }, [pages, gap, margin, cropMarks, numberStyle, layoutId, numberSize, numberOffset, contentShift])
+  }, [pages, gap, margin, cropMarks, showNumbers, numberStyle, layoutId, numberSize, numberOffset, contentShift])
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
@@ -493,6 +782,24 @@ export default function App() {
               {pages.length} page{pages.length === 1 ? '' : 's'} · {visibleSheets.length} US Letter sheet
               {visibleSheets.length === 1 ? '' : 's'}
             </span>
+            <button
+              onClick={() => {
+                const bothReal = visibleSheets.findIndex((s) =>
+                  s.slots.every((slot) => slot.page && !slot.page.blank),
+                )
+                const idx = bothReal >= 0 ? bothReal : 0
+                const first = visibleSheets[idx]
+                setEditSheetIndex(idx)
+                setEditSelectedPageId(
+                  first?.slots.find((s) => s.page && !s.page.blank)?.page?.id ?? null,
+                )
+                setEditOpen(true)
+              }}
+              disabled={pages.length === 0}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Edit
+            </button>
             <button
               onClick={createPdf}
               disabled={pages.length === 0}
@@ -620,52 +927,65 @@ export default function App() {
 
           <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <h2 className="mb-3 text-sm font-semibold text-slate-700">Page numbers</h2>
-            <select
-              value={numberStyle}
-              onChange={(e) => setNumberStyle(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
-            >
-              {NUMBER_STYLES.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-2 text-xs text-slate-400">
-              Rendered at the bottom center of every page.
-            </p>
-            <div className="mt-3 space-y-3">
-              <div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-600">Size</span>
-                  <span className="tabular-nums text-slate-600">{Math.round(numberSize * 100)}%</span>
+            <label className="flex cursor-pointer items-center gap-3">
+              <input
+                type="checkbox"
+                checked={showNumbers}
+                onChange={(e) => setShowNumbers(e.target.checked)}
+                className="h-4 w-4 accent-indigo-600"
+              />
+              <span className="text-sm text-slate-600">Show page numbers</span>
+            </label>
+            {showNumbers && (
+              <div className="mt-3">
+                <select
+                  value={numberStyle}
+                  onChange={(e) => setNumberStyle(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+                >
+                  {NUMBER_STYLES.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-slate-400">
+                  Rendered at the bottom center of every page.
+                </p>
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Size</span>
+                      <span className="tabular-nums text-slate-600">{Math.round(numberSize * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="2"
+                      step="0.05"
+                      value={numberSize}
+                      onChange={(e) => setNumberSize(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Distance from bottom</span>
+                      <span className="tabular-nums text-slate-600">{numberOffset} mm</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="20"
+                      step="1"
+                      value={numberOffset}
+                      onChange={(e) => setNumberOffset(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2"
-                  step="0.05"
-                  value={numberSize}
-                  onChange={(e) => setNumberSize(Number(e.target.value))}
-                  className="w-full"
-                />
               </div>
-              <div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-600">Distance from bottom</span>
-                  <span className="tabular-nums text-slate-600">{numberOffset} mm</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="20"
-                  step="1"
-                  value={numberOffset}
-                  onChange={(e) => setNumberOffset(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </div>
+            )}
           </section>
 
           <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
@@ -781,32 +1101,34 @@ export default function App() {
               </p>
             </div>
           </section>
-
-          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-            <h2 className="mb-3 text-sm font-semibold text-slate-700">Preview</h2>
-            <div className="space-y-3">
-              {visibleSheets.map((sheet) => (
-                <SheetPreview
-                  key={`${sheet.sheetNumber}-${sheet.side}`}
-                  sheetNumber={sheet.sheetNumber}
-                  side={sheet.side}
-                  slots={sheet.slots}
-                  margin={margin}
-                  gap={gap}
-                  cropMarks={cropMarks}
-                  numberStyle={numberStyle}
-                  numberSize={numberSize}
-                  numberOffset={numberOffset}
-                  contentShift={contentShift}
-                />
-              ))}
-              {pages.length === 0 && (
-                <p className="text-center text-sm text-slate-400">Upload pages to preview.</p>
-              )}
-            </div>
-          </section>
         </aside>
       </main>
+
+      {editOpen && (
+        <EditModal
+          sheets={visibleSheets}
+          pages={pages}
+          sheetIndex={editSheetIndex}
+          selectedPageId={editSelectedPageId}
+          onSelectSheet={(index) => {
+            setEditSheetIndex(index)
+            setEditSelectedPageId(
+              visibleSheets[index]?.slots.find((s) => s.page && !s.page.blank)?.page?.id ?? null,
+            )
+          }}
+          onSelectPage={setEditSelectedPageId}
+          onEdit={editPage}
+          onClose={() => setEditOpen(false)}
+          margin={margin}
+          gap={gap}
+          cropMarks={cropMarks}
+          showNumbers={showNumbers}
+          numberStyle={numberStyle}
+          numberSize={numberSize}
+          numberOffset={numberOffset}
+          contentShift={contentShift}
+        />
+      )}
 
       {dialogPage && (
         <WhiteningDialog
