@@ -12,6 +12,9 @@ const LETTER_H = 216
 const DEFAULT_MARGIN = 10
 const DEFAULT_TOLERANCE = 4
 const DEFAULT_FEATHER = 1
+const DEFAULT_NUMBER_SIZE = 1
+const DEFAULT_NUMBER_OFFSET = 2
+const DEFAULT_CONTENT_SHIFT = 0
 
 function containedSize(naturalW, naturalH, slotW, slotH) {
   const ratio = naturalW / naturalH
@@ -88,7 +91,7 @@ function useImageSize(src) {
   return size
 }
 
-function SheetPreview({ sheetNumber, side, slots, margin, gap, cropMarks, numberStyle }) {
+function SheetPreview({ sheetNumber, side, slots, margin, gap, cropMarks, numberStyle, numberSize, numberOffset, contentShift }) {
   const [leftSlot, rightSlot] = slots
   const leftSize = useImageSize(leftSlot.page && !leftSlot.page.blank ? leftSlot.page.url : null)
   const rightSize = useImageSize(rightSlot.page && !rightSlot.page.blank ? rightSlot.page.url : null)
@@ -103,6 +106,7 @@ function SheetPreview({ sheetNumber, side, slots, margin, gap, cropMarks, number
   const halfW = (usableW - gapPx) / 2
   const leftX = marginPx
   const rightX = marginPx + halfW + gapPx
+  const shiftPx = contentShift * pxPerMm
 
   const renderPage = (slot, size, x) => {
     const { page, number } = slot
@@ -123,6 +127,7 @@ function SheetPreview({ sheetNumber, side, slots, margin, gap, cropMarks, number
       )
     }
     const { dw, dh, x: ix, y: iy } = containedSize(size.w, size.h, halfW, usableH)
+    const numW = Math.round(halfW * 0.5 * numberSize)
     return (
       <div
         className="absolute overflow-hidden"
@@ -130,15 +135,18 @@ function SheetPreview({ sheetNumber, side, slots, margin, gap, cropMarks, number
       >
         <div
           className="absolute"
-          style={{ left: `${ix}px`, top: `${iy}px`, width: `${dw}px`, height: `${dh}px` }}
+          style={{ left: `${ix}px`, top: `${iy - shiftPx}px`, width: `${dw}px`, height: `${dh}px` }}
         >
           <img src={page.url} alt="" className="h-full w-full" draggable={false} />
         </div>
         <span className="absolute bottom-0.5 left-0.5 rounded bg-slate-900/70 px-1 py-0.5 text-[10px] leading-none text-white">
           {Math.round((dw / pxPerMm) * 10) / 10} × {Math.round((dh / pxPerMm) * 10) / 10} mm
         </span>
-        <div className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2">
-          <PageNumber number={number} style={numberStyle} width={Math.round(halfW * 0.5)} />
+        <div
+          className="pointer-events-none absolute left-1/2 -translate-x-1/2"
+          style={{ bottom: `${numberOffset * pxPerMm}px` }}
+        >
+          <PageNumber number={number} style={numberStyle} width={numW} />
         </div>
       </div>
     )
@@ -302,6 +310,9 @@ export default function App() {
   const [dialogPage, setDialogPage] = useState(null)
   const [layoutId, setLayoutId] = useState('default')
   const [numberStyle, setNumberStyle] = useState(() => getLayout('default').pageNumber.style)
+  const [numberSize, setNumberSize] = useState(DEFAULT_NUMBER_SIZE)
+  const [numberOffset, setNumberOffset] = useState(DEFAULT_NUMBER_OFFSET)
+  const [contentShift, setContentShift] = useState(DEFAULT_CONTENT_SHIFT)
   const fileInputRef = useRef(null)
 
   const layout = getLayout(layoutId)
@@ -412,7 +423,7 @@ export default function App() {
 
     const placeImage = (img, x, y, w, h) => {
       const { dw, dh, x: ix, y: iy } = containedSize(img.naturalWidth, img.naturalHeight, w, h)
-      doc.addImage(img, 'JPEG', x + ix, y + iy, dw, dh, undefined, 'FAST')
+      doc.addImage(img, 'JPEG', x + ix, y + iy - contentShift, dw, dh, undefined, 'FAST')
     }
 
     const placePage = (slot, x, y, w, h) => {
@@ -440,10 +451,10 @@ export default function App() {
       if (number == null) return
       const dataUrl = await getNumberImage(number)
       if (!dataUrl) return
-      const numW = Math.min(w * 0.5, 60)
+      const numW = Math.min(w * 0.5 * numberSize, 60 * numberSize)
       const numH = (numW * 56) / 240
       const nx = x + (w - numW) / 2
-      const ny = y + h - numH - 2
+      const ny = y + h - numH - numberOffset
       doc.addImage(dataUrl, 'PNG', nx, ny, numW, numH, undefined, 'FAST')
     }
 
@@ -470,7 +481,7 @@ export default function App() {
     }
 
     doc.save('book.pdf')
-  }, [pages, gap, margin, cropMarks, numberStyle, layoutId])
+  }, [pages, gap, margin, cropMarks, numberStyle, layoutId, numberSize, numberOffset, contentShift])
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
@@ -623,6 +634,38 @@ export default function App() {
             <p className="mt-2 text-xs text-slate-400">
               Rendered at the bottom center of every page.
             </p>
+            <div className="mt-3 space-y-3">
+              <div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-600">Size</span>
+                  <span className="tabular-nums text-slate-600">{Math.round(numberSize * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.05"
+                  value={numberSize}
+                  onChange={(e) => setNumberSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-600">Distance from bottom</span>
+                  <span className="tabular-nums text-slate-600">{numberOffset} mm</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="20"
+                  step="1"
+                  value={numberOffset}
+                  onChange={(e) => setNumberOffset(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
           </section>
 
           <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
@@ -660,6 +703,26 @@ export default function App() {
             </div>
             <p className="mt-2 text-xs text-slate-400">
               Gap between the two book pages on each US Letter sheet.
+            </p>
+          </section>
+
+          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <h2 className="mb-3 text-sm font-semibold text-slate-700">Content shift</h2>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min="0"
+                max="30"
+                step="1"
+                value={contentShift}
+                onChange={(e) => setContentShift(Number(e.target.value))}
+                className="flex-1"
+              />
+              <span className="w-12 text-right text-sm tabular-nums text-slate-600">{contentShift} mm</span>
+            </div>
+            <p className="mt-2 text-xs text-slate-400">
+              Shifts all page content up by this amount to compensate for a larger top margin in
+              uploaded images.
             </p>
           </section>
 
@@ -732,6 +795,9 @@ export default function App() {
                   gap={gap}
                   cropMarks={cropMarks}
                   numberStyle={numberStyle}
+                  numberSize={numberSize}
+                  numberOffset={numberOffset}
+                  contentShift={contentShift}
                 />
               ))}
               {pages.length === 0 && (

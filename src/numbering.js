@@ -2,6 +2,7 @@ const RUNES = ['ᚠ', 'ᚢ', 'ᚦ', 'ᚨ', 'ᚱ', 'ᚲ', 'ᚷ', 'ᚹ', 'ᚺ', '�
 
 export const NUMBER_STYLES = [
   { id: 'classic', label: 'Classic · Roman numerals' },
+  { id: 'arabic', label: 'Arabic numerals' },
   { id: 'ancient', label: 'Ancient · Dragon runes' },
 ]
 
@@ -33,5 +34,6 @@ export function runicize(n) {
 export function formatPageNumber(n, style) {
   if (n == null || n < 1) return ''
   if (style === 'ancient') return runicize(n)
+  if (style === 'arabic') return String(n)
   return romanize(n)
 }
