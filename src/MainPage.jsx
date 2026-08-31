@@ -38,10 +38,14 @@ export default function MainPage() {
     applyWhiten,
     keepOriginal,
     createPdf,
+    saveProject,
+    loadProject,
   } = useBook()
 
   const [dragIndex, setDragIndex] = useState(null)
+  const [loadError, setLoadError] = useState(null)
   const fileInputRef = useRef(null)
+  const loadInputRef = useRef(null)
 
   const layout = getLayout(layoutId)
 
@@ -92,6 +96,36 @@ export default function MainPage() {
             <span className="text-sm text-slate-500">
               {pages.length} page{pages.length === 1 ? '' : 's'}
             </span>
+            <input
+              ref={loadInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (!file) return
+                setLoadError(null)
+                try {
+                  await loadProject(file)
+                } catch (err) {
+                  setLoadError(err.message || 'Failed to load project.')
+                }
+              }}
+            />
+            <button
+              onClick={() => loadInputRef.current?.click()}
+              className="border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              Load
+            </button>
+            <button
+              onClick={saveProject}
+              disabled={pages.length === 0}
+              className="border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Save
+            </button>
             <button
               onClick={() => navigate('/edit')}
               disabled={pages.length === 0}
@@ -142,6 +176,12 @@ export default function MainPage() {
               Each image becomes one book page. Drag to reorder. Click a page to adjust whitening.
             </p>
           </div>
+
+          {loadError && (
+            <div className="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {loadError}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {sides.map((side, si) => (

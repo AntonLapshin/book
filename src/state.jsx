@@ -15,6 +15,30 @@ export const DEFAULT_CONTENT_SHIFT = 0
 
 export const DEFAULT_EDIT = { x: 0, y: 0, scale: 1 }
 
+export const PROJECT_TYPE = 'book-maker-project'
+export const PROJECT_VERSION = 1
+
+async function urlToDataUrl(url) {
+  const res = await fetch(url)
+  const blob = await res.blob()
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+function dataUrlToObjectUrl(dataUrl) {
+  const comma = dataUrl.indexOf(',')
+  const meta = dataUrl.slice(0, comma)
+  const mime = meta.match(/data:(.*?);/)?.[1] ?? 'image/png'
+  const binary = atob(dataUrl.slice(comma + 1))
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return URL.createObjectURL(new Blob([bytes], { type: mime }))
+}
+
 const BookContext = createContext(null)
 
 export function containedSize(naturalW, naturalH, slotW, slotH) {
@@ -213,6 +237,105 @@ export function BookProvider({ children }) {
     doc.save('book.pdf')
   }, [pages, gap, margin, showNumbers, numberStyle, layoutId, numberSize, numberOffset, contentShift])
 
+  const saveProject = useCallback(async () => {
+    const serializedPages = await Promise.all(
+      pages.map(async (p) => {
+        const base = {
+          id: p.id,
+          name: p.name,
+          blank: p.blank,
+          whitened: p.whitened,
+          edit: { ...DEFAULT_EDIT, ...p.edit },
+        }
+        if (p.blank) return base
+        return {
+          ...base,
+          original: await urlToDataUrl(p.originalUrl),
+          image: await urlToDataUrl(p.url),
+        }
+      }),
+    )
+
+    const project = {
+      type: PROJECT_TYPE,
+      version: PROJECT_VERSION,
+      savedAt: new Date().toISOString(),
+      settings: {
+        gap,
+        margin,
+        whitenTolerance,
+        whitenFeather,
+        layoutId,
+        showNumbers,
+        numberStyle,
+        numberSize,
+        numberOffset,
+        contentShift,
+      },
+      pages: serializedPages,
+    }
+
+    const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'book-project.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [
+    pages,
+    gap,
+    margin,
+    whitenTolerance,
+    whitenFeather,
+    layoutId,
+    showNumbers,
+    numberStyle,
+    numberSize,
+    numberOffset,
+    contentShift,
+  ])
+
+  const loadProject = useCallback(
+    async (file) => {
+      const text = await file.text()
+      const project = JSON.parse(text)
+      if (project.type !== PROJECT_TYPE) {
+        throw new Error('Not a Book Maker project file.')
+      }
+
+      const s = project.settings ?? {}
+      setGap(s.gap ?? 6)
+      setMargin(s.margin ?? DEFAULT_MARGIN)
+      setWhitenTolerance(s.whitenTolerance ?? DEFAULT_TOLERANCE)
+      setWhitenFeather(s.whitenFeather ?? DEFAULT_FEATHER)
+      setLayoutId(s.layoutId ?? 'default')
+      setShowNumbers(s.showNumbers ?? true)
+      setNumberStyle(s.numberStyle ?? getLayout('default').pageNumber.style)
+      setNumberSize(s.numberSize ?? DEFAULT_NUMBER_SIZE)
+      setNumberOffset(s.numberOffset ?? DEFAULT_NUMBER_OFFSET)
+      setContentShift(s.contentShift ?? DEFAULT_CONTENT_SHIFT)
+
+      const loaded = (project.pages ?? []).map((p) => {
+        if (p.blank) {
+          return { id: p.id, name: p.name, url: null, blank: true, edit: { ...DEFAULT_EDIT, ...p.edit } }
+        }
+        return {
+          id: p.id,
+          name: p.name,
+          originalUrl: dataUrlToObjectUrl(p.original),
+          url: dataUrlToObjectUrl(p.image),
+          blank: false,
+          whitened: !!p.whitened,
+          edit: { ...DEFAULT_EDIT, ...p.edit },
+        }
+      })
+      setPages(loaded)
+      setDialogPage(null)
+    },
+    [],
+  )
+
   const value = useMemo(
     () => ({
       pages,
@@ -247,6 +370,8 @@ export function BookProvider({ children }) {
       keepOriginal,
       editPage,
       createPdf,
+      saveProject,
+      loadProject,
     }),
     [
       pages,
@@ -270,6 +395,8 @@ export function BookProvider({ children }) {
       keepOriginal,
       editPage,
       createPdf,
+      saveProject,
+      loadProject,
     ],
   )
 
