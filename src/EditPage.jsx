@@ -71,6 +71,34 @@ export default function EditPage() {
     editPage(selectedPage.id, { x: (edit.x ?? 0) + dx, y: (edit.y ?? 0) + dy })
   }
 
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = e.target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      const step = e.shiftKey ? 5 : 1
+      switch (e.key) {
+        case 'ArrowUp':
+          e.preventDefault()
+          adjust(0, -step)
+          break
+        case 'ArrowDown':
+          e.preventDefault()
+          adjust(0, step)
+          break
+        case 'ArrowLeft':
+          e.preventDefault()
+          adjust(-step, 0)
+          break
+        case 'ArrowRight':
+          e.preventDefault()
+          adjust(step, 0)
+          break
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedPage, adjust])
+
   const handleResizeStart = (e, page, el) => {
     e.preventDefault()
     e.stopPropagation()
