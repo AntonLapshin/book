@@ -169,7 +169,7 @@ export function SheetView({
         {showNumbers && (
           <div
             className="pointer-events-none absolute left-1/2 -translate-x-1/2"
-            style={{ bottom: `${numberOffset * pxPerMm}px` }}
+            style={{ bottom: `${numberOffset * pxPerMm}px`, zIndex: 20 }}
           >
             <PageNumber number={number} style={numberStyle} width={numW} />
           </div>

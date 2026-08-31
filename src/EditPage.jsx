@@ -17,16 +17,21 @@ export default function EditPage() {
     contentShift,
     layoutId,
     editPage,
+    showHelperLines,
+    setShowHelperLines,
+    helperTop,
+    setHelperTop,
+    helperLeft,
+    setHelperLeft,
+    helperBottom,
+    setHelperBottom,
+    helperRight,
+    setHelperRight,
   } = useBook()
 
   const [sheetIndex, setSheetIndex] = useState(0)
   const [selectedPageId, setSelectedPageId] = useState(null)
   const [drag, setDrag] = useState(null)
-  const [showHelperLines, setShowHelperLines] = useState(false)
-  const [helperTop, setHelperTop] = useState(6)
-  const [helperLeft, setHelperLeft] = useState(6)
-  const [helperBottom, setHelperBottom] = useState(6)
-  const [helperRight, setHelperRight] = useState(6)
 
   const layout = getLayout(layoutId)
   const sheets = buildSheets(pages, layout)

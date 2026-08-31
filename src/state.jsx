@@ -12,6 +12,10 @@ export const DEFAULT_FEATHER = 1
 export const DEFAULT_NUMBER_SIZE = 1
 export const DEFAULT_NUMBER_OFFSET = 2
 export const DEFAULT_CONTENT_SHIFT = 0
+export const DEFAULT_HELPER_TOP = 6
+export const DEFAULT_HELPER_LEFT = 6
+export const DEFAULT_HELPER_BOTTOM = 6
+export const DEFAULT_HELPER_RIGHT = 6
 
 export const DEFAULT_EDIT = { x: 0, y: 0, scale: 1 }
 
@@ -64,6 +68,11 @@ export function BookProvider({ children }) {
   const [numberSize, setNumberSize] = useState(DEFAULT_NUMBER_SIZE)
   const [numberOffset, setNumberOffset] = useState(DEFAULT_NUMBER_OFFSET)
   const [contentShift, setContentShift] = useState(DEFAULT_CONTENT_SHIFT)
+  const [showHelperLines, setShowHelperLines] = useState(false)
+  const [helperTop, setHelperTop] = useState(DEFAULT_HELPER_TOP)
+  const [helperLeft, setHelperLeft] = useState(DEFAULT_HELPER_LEFT)
+  const [helperBottom, setHelperBottom] = useState(DEFAULT_HELPER_BOTTOM)
+  const [helperRight, setHelperRight] = useState(DEFAULT_HELPER_RIGHT)
   const [dialogPage, setDialogPage] = useState(null)
 
   const addFiles = useCallback(
@@ -359,6 +368,16 @@ export function BookProvider({ children }) {
       setNumberOffset,
       contentShift,
       setContentShift,
+      showHelperLines,
+      setShowHelperLines,
+      helperTop,
+      setHelperTop,
+      helperLeft,
+      setHelperLeft,
+      helperBottom,
+      setHelperBottom,
+      helperRight,
+      setHelperRight,
       dialogPage,
       setDialogPage,
       addFiles,
@@ -386,6 +405,11 @@ export function BookProvider({ children }) {
       numberOffset,
       contentShift,
       dialogPage,
+      showHelperLines,
+      helperTop,
+      helperLeft,
+      helperBottom,
+      helperRight,
       addFiles,
       addBlank,
       swap,
