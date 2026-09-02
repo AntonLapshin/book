@@ -11,6 +11,7 @@ export const DEFAULT_TOLERANCE = 4
 export const DEFAULT_FEATHER = 1
 export const DEFAULT_NUMBER_SIZE = 1
 export const DEFAULT_NUMBER_OFFSET = 2
+export const DEFAULT_START_PAGE_NUMBER = 1
 export const DEFAULT_CONTENT_SHIFT = 0
 export const DEFAULT_HELPER_TOP = 6
 export const DEFAULT_HELPER_LEFT = 6
@@ -18,6 +19,9 @@ export const DEFAULT_HELPER_BOTTOM = 6
 export const DEFAULT_HELPER_RIGHT = 6
 
 export const DEFAULT_EDIT = { x: 0, y: 0, scale: 1 }
+
+export const DEFAULT_PDF_DPI = 300
+export const DEFAULT_PDF_QUALITY = 0.85
 
 export const PROJECT_TYPE = 'book-maker-project'
 export const PROJECT_VERSION = 1
@@ -56,6 +60,35 @@ export function containedSize(naturalW, naturalH, slotW, slotH) {
   return { dw, dh, x: (slotW - dw) / 2, y: (slotH - dh) / 2 }
 }
 
+const MM_PER_INCH = 25.4
+
+function reencodeImage(img, widthMm, heightMm, dpi, quality) {
+  return new Promise((resolve, reject) => {
+    const targetW = Math.max(1, Math.round((widthMm / MM_PER_INCH) * dpi))
+    const targetH = Math.max(1, Math.round((heightMm / MM_PER_INCH) * dpi))
+    const scale = Math.min(1, targetW / img.naturalWidth, targetH / img.naturalHeight)
+    const outW = Math.max(1, Math.round(img.naturalWidth * scale))
+    const outH = Math.max(1, Math.round(img.naturalHeight * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = outW
+    canvas.height = outH
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(img, 0, 0, outW, outH)
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return reject(new Error('Failed to re-encode image'))
+        const url = URL.createObjectURL(blob)
+        const out = new Image()
+        out.onload = () => resolve(out)
+        out.onerror = () => reject(new Error('Failed to load re-encoded image'))
+        out.src = url
+      },
+      'image/jpeg',
+      quality,
+    )
+  })
+}
+
 export function BookProvider({ children }) {
   const [pages, setPages] = useState([])
   const [gap, setGap] = useState(6)
@@ -67,7 +100,10 @@ export function BookProvider({ children }) {
   const [numberStyle, setNumberStyle] = useState(() => getLayout('default').pageNumber.style)
   const [numberSize, setNumberSize] = useState(DEFAULT_NUMBER_SIZE)
   const [numberOffset, setNumberOffset] = useState(DEFAULT_NUMBER_OFFSET)
+  const [startPageNumber, setStartPageNumber] = useState(DEFAULT_START_PAGE_NUMBER)
   const [contentShift, setContentShift] = useState(DEFAULT_CONTENT_SHIFT)
+  const [pdfDpi, setPdfDpi] = useState(DEFAULT_PDF_DPI)
+  const [pdfQuality, setPdfQuality] = useState(DEFAULT_PDF_QUALITY)
   const [showHelperLines, setShowHelperLines] = useState(false)
   const [helperTop, setHelperTop] = useState(DEFAULT_HELPER_TOP)
   const [helperLeft, setHelperLeft] = useState(DEFAULT_HELPER_LEFT)
@@ -184,20 +220,22 @@ export function BookProvider({ children }) {
     const usableH = LETTER_H - margin * 2
     const halfW = (usableW - gap) / 2
 
-    const placeImage = (img, x, y, w, h, edit) => {
+    const placeImage = async (img, x, y, w, h, edit) => {
       const { dw, dh } = containedSize(img.naturalWidth, img.naturalHeight, w, h)
       const edit2 = { ...DEFAULT_EDIT, ...edit }
       const dw2 = dw * edit2.scale
       const dh2 = dh * edit2.scale
       const cx = x + (w - dw2) / 2 + edit2.x
       const cy = y + (h - dh2) / 2 + edit2.y - contentShift
-      doc.addImage(img, 'JPEG', cx, cy, dw2, dh2, undefined, 'FAST')
+      const encoded = await reencodeImage(img, dw2, dh2, pdfDpi, pdfQuality)
+      doc.addImage(encoded, 'JPEG', cx, cy, dw2, dh2, undefined, 'FAST')
+      URL.revokeObjectURL(encoded.src)
     }
 
-    const placePage = (slot, x, y, w, h) => {
+    const placePage = async (slot, x, y, w, h) => {
       const { page } = slot
       if (!page || page.blank) return
-      placeImage(imgMap.get(page.id), x, y, w, h, page.edit)
+      await placeImage(imgMap.get(page.id), x, y, w, h, page.edit)
     }
 
     const imagePages = pages.filter((p) => !p.blank)
@@ -227,15 +265,15 @@ export function BookProvider({ children }) {
     }
 
     const layout = getLayout(layoutId)
-    const sheets = buildSheets(pages, layout)
+    const sheets = buildSheets(pages, layout, startPageNumber)
     const visibleSheets = sheets.filter((s) => s.slots.some((slot) => slot.page && !slot.page.blank))
 
     let pageIndex = 0
     for (const sheet of visibleSheets) {
       if (pageIndex > 0) doc.addPage('letter', 'landscape')
       const [leftSlot, rightSlot] = sheet.slots
-      placePage(leftSlot, margin, margin, halfW, usableH)
-      placePage(rightSlot, margin + halfW + gap, margin, halfW, usableH)
+      await placePage(leftSlot, margin, margin, halfW, usableH)
+      await placePage(rightSlot, margin + halfW + gap, margin, halfW, usableH)
       if (showNumbers) {
         await placeNumber(leftSlot, margin, margin, halfW, usableH)
         await placeNumber(rightSlot, margin + halfW + gap, margin, halfW, usableH)
@@ -244,7 +282,7 @@ export function BookProvider({ children }) {
     }
 
     doc.save('book.pdf')
-  }, [pages, gap, margin, showNumbers, numberStyle, layoutId, numberSize, numberOffset, contentShift])
+  }, [pages, gap, margin, showNumbers, numberStyle, layoutId, numberSize, numberOffset, startPageNumber, contentShift, pdfDpi, pdfQuality])
 
   const saveProject = useCallback(async () => {
     const serializedPages = await Promise.all(
@@ -279,7 +317,10 @@ export function BookProvider({ children }) {
         numberStyle,
         numberSize,
         numberOffset,
+        startPageNumber,
         contentShift,
+        pdfDpi,
+        pdfQuality,
       },
       pages: serializedPages,
     }
@@ -302,7 +343,10 @@ export function BookProvider({ children }) {
     numberStyle,
     numberSize,
     numberOffset,
+    startPageNumber,
     contentShift,
+    pdfDpi,
+    pdfQuality,
   ])
 
   const loadProject = useCallback(
@@ -323,7 +367,10 @@ export function BookProvider({ children }) {
       setNumberStyle(s.numberStyle ?? getLayout('default').pageNumber.style)
       setNumberSize(s.numberSize ?? DEFAULT_NUMBER_SIZE)
       setNumberOffset(s.numberOffset ?? DEFAULT_NUMBER_OFFSET)
+      setStartPageNumber(s.startPageNumber ?? DEFAULT_START_PAGE_NUMBER)
       setContentShift(s.contentShift ?? DEFAULT_CONTENT_SHIFT)
+      setPdfDpi(s.pdfDpi ?? DEFAULT_PDF_DPI)
+      setPdfQuality(s.pdfQuality ?? DEFAULT_PDF_QUALITY)
 
       const loaded = (project.pages ?? []).map((p) => {
         if (p.blank) {
@@ -366,8 +413,14 @@ export function BookProvider({ children }) {
       setNumberSize,
       numberOffset,
       setNumberOffset,
+      startPageNumber,
+      setStartPageNumber,
       contentShift,
       setContentShift,
+      pdfDpi,
+      setPdfDpi,
+      pdfQuality,
+      setPdfQuality,
       showHelperLines,
       setShowHelperLines,
       helperTop,
@@ -403,8 +456,11 @@ export function BookProvider({ children }) {
       numberStyle,
       numberSize,
       numberOffset,
+      startPageNumber,
       contentShift,
       dialogPage,
+      pdfDpi,
+      pdfQuality,
       showHelperLines,
       helperTop,
       helperLeft,

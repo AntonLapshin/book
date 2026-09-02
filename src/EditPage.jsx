@@ -14,6 +14,7 @@ export default function EditPage() {
     numberStyle,
     numberSize,
     numberOffset,
+    startPageNumber,
     contentShift,
     layoutId,
     editPage,
@@ -34,7 +35,7 @@ export default function EditPage() {
   const [drag, setDrag] = useState(null)
 
   const layout = getLayout(layoutId)
-  const sheets = buildSheets(pages, layout)
+  const sheets = buildSheets(pages, layout, startPageNumber)
   const visibleSheets = sheets.filter((s) => s.slots.some((slot) => slot.page && !slot.page.blank))
 
   const selectedSheet = visibleSheets[sheetIndex] ?? null

@@ -13,9 +13,9 @@ function makeBlank(index) {
   }
 }
 
-export function buildSheets(pages, layout) {
+export function buildSheets(pages, layout, startPageNumber = 1) {
   const { signatureSize, sides } = layout.imposition
-  const numbered = pages.map((page, i) => ({ page, number: i + 1 }))
+  const numbered = pages.map((page, i) => ({ page, number: i + startPageNumber }))
   const padded = [...numbered]
   while (padded.length % signatureSize !== 0) {
     padded.push(makeBlank(padded.length))

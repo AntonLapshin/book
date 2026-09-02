@@ -27,8 +27,14 @@ export default function MainPage() {
     setNumberSize,
     numberOffset,
     setNumberOffset,
+    startPageNumber,
+    setStartPageNumber,
     contentShift,
     setContentShift,
+    pdfDpi,
+    setPdfDpi,
+    pdfQuality,
+    setPdfQuality,
     dialogPage,
     setDialogPage,
     addFiles,
@@ -277,6 +283,22 @@ export default function MainPage() {
                 <div className="mt-3 space-y-3">
                   <div>
                     <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Starting page number</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={startPageNumber}
+                        onChange={(e) => setStartPageNumber(Math.max(1, Number(e.target.value) || 1))}
+                        className="w-20 border border-slate-300 bg-white px-2 py-1 text-right text-sm tabular-nums text-slate-700"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-slate-400">
+                      The number printed on the first page. Defaults to 1.
+                    </p>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-600">Size</span>
                       <span className="tabular-nums text-slate-600">{Math.round(numberSize * 100)}%</span>
                     </div>
@@ -365,6 +387,46 @@ export default function MainPage() {
             <p className="mt-2 text-xs text-slate-400">
               Shifts all page content up by this amount to compensate for a larger top margin in
               uploaded images.
+            </p>
+          </section>
+
+          <section className="bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <h2 className="mb-3 text-sm font-semibold text-slate-700">PDF compression</h2>
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-600">Resolution</span>
+                  <span className="tabular-nums text-slate-600">{pdfDpi} DPI</span>
+                </div>
+                <input
+                  type="range"
+                  min="72"
+                  max="300"
+                  step="1"
+                  value={pdfDpi}
+                  onChange={(e) => setPdfDpi(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-600">JPEG quality</span>
+                  <span className="tabular-nums text-slate-600">{Math.round(pdfQuality * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.3"
+                  max="1"
+                  step="0.01"
+                  value={pdfQuality}
+                  onChange={(e) => setPdfQuality(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-slate-400">
+              Images are re-encoded before embedding. Lower DPI and quality shrink the PDF file size
+              (300 DPI / 85% is good for print; 150 DPI / 70% is much smaller).
             </p>
           </section>
 

@@ -42,6 +42,6 @@ export function pageNumberSvg({ number, style, width = VB_W, height = VB_H, colo
   <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-family="${fontFamily}" font-size="${fontSize}" fill="${ink}">${escapeXml(text)}</text>
   <text x="${leftX}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="${ornSize}" fill="${accent}">${ornament}</text>
   <text x="${rightX}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="${ornSize}" fill="${accent}">${ornament}</text>
-  <line x1="${leftX + ornSize * 0.8}" y1="${ruleY}" x2="${rightX - ornSize * 0.8}" y2="${ruleY}" stroke="${accent}" stroke-width="1.2" stroke-opacity="0.55"/>
+${style === 'arabic' ? '' : `<line x1="${leftX + ornSize * 0.8}" y1="${ruleY}" x2="${rightX - ornSize * 0.8}" y2="${ruleY}" stroke="${accent}" stroke-width="1.2" stroke-opacity="0.55"/>`}
 </svg>`
 }
